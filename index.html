@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure Portal</title>
+    <title>Secure Network Access</title>
     <style>
+        /* Base Page Styles */
         body {
             font-family: Arial, sans-serif;
             background-color: #f4f4f9;
@@ -13,8 +14,11 @@
             align-items: center;
             height: 100vh;
             margin: 0;
+            transition: background-color 0.5s ease;
         }
-        .login-container {
+
+        /* Authentication Section (Login/Register) */
+        .auth-wrapper {
             background: white;
             padding: 2rem;
             border-radius: 8px;
@@ -70,17 +74,54 @@
         #message { margin-top: 1rem; text-align: center; font-weight: bold; }
         .success { color: green; }
         .error { color: red; }
+
+        /* Premium Welcome Dashboard */
+        .welcome-wrapper {
+            display: none;
+            border: 1px solid #222;
+            padding: 4rem;
+            border-radius: 4px;
+            background: linear-gradient(145deg, #0a0a0a, #111111);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+            text-align: center;
+            font-family: 'Georgia', serif;
+            color: #ffffff;
+        }
+        .welcome-wrapper h1 {
+            font-size: 2.2rem;
+            font-weight: normal;
+            letter-spacing: 2px;
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: #d4af37;
+        }
+        .welcome-wrapper p {
+            font-family: 'Arial', sans-serif;
+            color: #888;
+            font-size: 1rem;
+            letter-spacing: 1px;
+            margin-bottom: 30px;
+        }
+        .status {
+            display: inline-block;
+            padding: 10px 20px;
+            border: 1px solid #00ff41;
+            color: #00ff41;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
     </style>
 </head>
 <body>
 
-<div class="login-container">
+<div id="authSection" class="auth-wrapper">
     <div class="tabs">
         <button class="tab-btn active" onclick="switchTab('login')">Log In</button>
         <button class="tab-btn" onclick="switchTab('register')">Create Account</button>
     </div>
 
-    <!-- Login Form -->
     <div id="loginPanel" class="form-panel active">
         <h2>Portal Access</h2>
         <form id="loginForm">
@@ -96,7 +137,6 @@
         </form>
     </div>
 
-    <!-- Create Account Form -->
     <div id="registerPanel" class="form-panel">
         <h2>New Account</h2>
         <form id="registerForm">
@@ -113,6 +153,12 @@
     </div>
 
     <div id="message"></div>
+</div>
+
+<div id="welcomeSection" class="welcome-wrapper">
+    <h1>Authentication Confirmed</h1>
+    <p>Welcome to the Secure Network Dashboard, <span id="displayUsername" style="color: white; font-weight: bold;"></span>.</p>
+    <div class="status">System Access Granted</div>
 </div>
 
 <script>
@@ -135,15 +181,12 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        
-        // Single fetch function for both forms
         async function handleAuthRequest(action, user, pass) {
             const messageDiv = document.getElementById('message');
             messageDiv.textContent = "Processing...";
             messageDiv.className = "";
 
             try {
-                // Both forms now point to the exact same file: /api/auth
                 const response = await fetch('/api/auth', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -152,9 +195,14 @@
                 const data = await response.json();
                 
                 if (response.ok && data.success) {
-                    messageDiv.textContent = data.message;
-                    messageDiv.className = 'success';
-                    if (action === 'register') {
+                    if (action === 'login') {
+                        document.body.style.backgroundColor = '#050505';
+                        document.getElementById('authSection').style.display = 'none';
+                        document.getElementById('displayUsername').textContent = user;
+                        document.getElementById('welcomeSection').style.display = 'block';
+                    } else {
+                        messageDiv.textContent = data.message;
+                        messageDiv.className = 'success';
                         document.getElementById('registerForm').reset();
                     }
                 } else {
@@ -167,7 +215,6 @@
             }
         }
 
-        // Login Listener
         document.getElementById('loginForm').addEventListener('submit', function(event) {
             event.preventDefault();
             const user = document.getElementById('username').value;
@@ -175,7 +222,6 @@
             handleAuthRequest('login', user, pass);
         });
 
-        // Register Listener
         document.getElementById('registerForm').addEventListener('submit', function(event) {
             event.preventDefault();
             const newUser = document.getElementById('newUsername').value;
