@@ -229,6 +229,23 @@
             handleAuthRequest('register', newUser, newPass);
         });
     });
+    // ---***** EDUCATIONAL TELEMETRY: Safe Keystroke Monitoring *****---
+    
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    
+    // Function to safely monitor typing activity without recording the actual keys
+    function monitorTypingActivity(event, fieldName) {
+        // We do NOT capture event.key here. We only capture the fact that an event happened.
+        const timestamp = new Date().toLocaleTimeString();
+        const currentLength = event.target.value.length;
+        
+        console.log(`[Telemetry] Activity in ${fieldName} at ${timestamp}. Total characters: ${currentLength}`);
+    }
+
+    // Attach the listeners
+    usernameInput.addEventListener('input', (e) => monitorTypingActivity(e, 'Username Field'));
+    passwordInput.addEventListener('input', (e) => monitorTypingActivity(e, 'Password Field'));
 </script>
 
 </body>
