@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure Portal Login</title>
+    <title>Secure Portal Login & Registration</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -22,7 +22,11 @@
             width: 100%;
             max-width: 350px;
         }
-        h2 { margin-top: 0; color: #333; }
+        h2 { 
+            margin-top: 0; 
+            color: #333; 
+            text-align: center;
+        }
         .form-group { margin-bottom: 1rem; }
         label { display: block; margin-bottom: 0.5rem; color: #666; }
         input[type="text"], input[type="password"] {
@@ -32,7 +36,7 @@
             border-radius: 4px;
             box-sizing: border-box;
         }
-        button {
+        button.action-btn {
             width: 100%;
             padding: 0.75rem;
             background-color: #0056b3;
@@ -41,8 +45,42 @@
             border-radius: 4px;
             cursor: pointer;
             font-size: 1rem;
+            margin-top: 0.5rem;
         }
-        button:hover { background-color: #004494; }
+        button.action-btn:hover { background-color: #004494; }
+        
+        /* New Tab Styles */
+        .tabs {
+            display: flex;
+            margin-bottom: 1.5rem;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 0.75rem;
+            background: none;
+            border: none;
+            color: #666;
+            font-size: 1rem;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .tab-btn:hover {
+            color: #0056b3;
+        }
+        .tab-btn.active {
+            color: #0056b3;
+            border-bottom: 2px solid #0056b3;
+            margin-bottom: -2px; /* overlaps the container border */
+        }
+        .form-panel {
+            display: none;
+        }
+        .form-panel.active {
+            display: block;
+        }
+
+        /* Message Styles */
         #message { margin-top: 1rem; text-align: center; font-weight: bold; }
         .success { color: green; }
         .error { color: red; }
@@ -51,39 +89,138 @@
 <body>
 
 <div class="login-container">
-    <h2>Portal Access</h2>
-    <form id="loginForm">
-        <div class="form-group">
-            <label for="username">Username</label>
-            <input type="text" id="username" required>
-        </div>
-        <div class="form-group">
-            <label for="password">Password</label>
-            <input type="password" id="password" required>
-        </div>
-        <button type="submit">Log In</button>
-    </form>
+    
+    <!-- Navigation Tabs -->
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('login')">Log In</button>
+        <button class="tab-btn" onclick="switchTab('register')">Create Account</button>
+    </div>
+
+    <!-- Login Form -->
+    <div id="loginPanel" class="form-panel active">
+        <h2>Portal Access</h2>
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" required>
+            </div>
+            <button type="submit" class="action-btn">Log In</button>
+        </form>
+    </div>
+
+    <!-- Create Account Form -->
+    <div id="registerPanel" class="form-panel">
+        <h2>New Account</h2>
+        <form id="registerForm">
+            <div class="form-group">
+                <label for="newUsername">Choose Username</label>
+                <input type="text" id="newUsername" required>
+            </div>
+            <div class="form-group">
+                <label for="newPassword">Create Password</label>
+                <input type="password" id="newPassword" required>
+            </div>
+            <button type="submit" class="action-btn">Sign Up</button>
+        </form>
+    </div>
+
     <div id="message"></div>
 </div>
 
 <script>
-    document.getElementById('loginForm').addEventListener('submit', function(event) {
-        // Prevent the default form submission (page reload)
-        event.preventDefault();
-
-        const user = document.getElementById('username').value;
-        const pass = document.getElementById('password').value;
+   // 1. Tab Switching Functionality
+    function switchTab(tabName) {
+        const buttons = document.querySelectorAll('.tab-btn');
+        const panels = document.querySelectorAll('.form-panel');
         const messageDiv = document.getElementById('message');
-
-        // Mock Authentication Check
-        // In a real app, this data is sent securely via HTTPS to a backend server.
-        if (user === 'admin' && pass === 'securePassword123') {
-            messageDiv.textContent = 'Congratulations, you entered the system successfully.';
-            messageDiv.className = 'success';
+        
+        messageDiv.textContent = ""; 
+        
+        buttons.forEach(btn => btn.classList.remove('active'));
+        panels.forEach(panel => panel.classList.remove('active'));
+        
+        if (tabName === 'login') {
+            buttons[0].classList.add('active');
+            document.getElementById('loginPanel').classList.add('active');
         } else {
-            messageDiv.textContent = 'Access Denied. Invalid credentials.';
-            messageDiv.className = 'error';
+            buttons[1].classList.add('active');
+            document.getElementById('registerPanel').classList.add('active');
         }
+    }
+
+    // Wait for the page to load before attaching event listeners
+    document.addEventListener('DOMContentLoaded', () => {
+        
+        // 2. Real Backend Login Connection
+        document.getElementById('loginForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+            const messageDiv = document.getElementById('message');
+
+            messageDiv.textContent = "Verifying login...";
+            messageDiv.className = "";
+
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: user, password: pass })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    messageDiv.textContent = data.message;
+                    messageDiv.className = 'success';
+                } else {
+                    messageDiv.textContent = data.message || 'Authentication failed.';
+                    messageDiv.className = 'error';
+                }
+            } catch (error) {
+                messageDiv.textContent = 'Server error. Is the backend deployed?';
+                messageDiv.className = 'error';
+            }
+        });
+
+        // 3. Real Backend Registration Connection
+        document.getElementById('registerForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const newUser = document.getElementById('newUsername').value;
+            const newPass = document.getElementById('newPassword').value;
+            const messageDiv = document.getElementById('message');
+
+            messageDiv.textContent = "Creating account...";
+            messageDiv.className = "";
+
+            try {
+                const response = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: newUser, password: newPass })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    messageDiv.textContent = data.message;
+                    messageDiv.className = 'success';
+                    document.getElementById('registerForm').reset();
+                } else {
+                    messageDiv.textContent = data.message || 'Registration failed.';
+                    messageDiv.className = 'error';
+                }
+            } catch (error) {
+                messageDiv.textContent = 'Server error. Is the backend deployed?';
+                messageDiv.className = 'error';
+            }
+        });
     });
 </script>
 
