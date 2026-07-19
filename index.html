@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure Portal Login & Registration</title>
+    <title>Secure Portal</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -22,11 +22,7 @@
             width: 100%;
             max-width: 350px;
         }
-        h2 { 
-            margin-top: 0; 
-            color: #333; 
-            text-align: center;
-        }
+        h2 { margin-top: 0; color: #333; text-align: center; }
         .form-group { margin-bottom: 1rem; }
         label { display: block; margin-bottom: 0.5rem; color: #666; }
         input[type="text"], input[type="password"] {
@@ -48,8 +44,6 @@
             margin-top: 0.5rem;
         }
         button.action-btn:hover { background-color: #004494; }
-        
-        /* New Tab Styles */
         .tabs {
             display: flex;
             margin-bottom: 1.5rem;
@@ -65,22 +59,14 @@
             cursor: pointer;
             font-weight: bold;
         }
-        .tab-btn:hover {
-            color: #0056b3;
-        }
+        .tab-btn:hover { color: #0056b3; }
         .tab-btn.active {
             color: #0056b3;
             border-bottom: 2px solid #0056b3;
-            margin-bottom: -2px; /* overlaps the container border */
+            margin-bottom: -2px;
         }
-        .form-panel {
-            display: none;
-        }
-        .form-panel.active {
-            display: block;
-        }
-
-        /* Message Styles */
+        .form-panel { display: none; }
+        .form-panel.active { display: block; }
         #message { margin-top: 1rem; text-align: center; font-weight: bold; }
         .success { color: green; }
         .error { color: red; }
@@ -89,8 +75,6 @@
 <body>
 
 <div class="login-container">
-    
-    <!-- Navigation Tabs -->
     <div class="tabs">
         <button class="tab-btn active" onclick="switchTab('login')">Log In</button>
         <button class="tab-btn" onclick="switchTab('register')">Create Account</button>
@@ -132,14 +116,12 @@
 </div>
 
 <script>
-   // 1. Tab Switching Functionality
     function switchTab(tabName) {
         const buttons = document.querySelectorAll('.tab-btn');
         const panels = document.querySelectorAll('.form-panel');
         const messageDiv = document.getElementById('message');
         
         messageDiv.textContent = ""; 
-        
         buttons.forEach(btn => btn.classList.remove('active'));
         panels.forEach(panel => panel.classList.remove('active'));
         
@@ -152,74 +134,53 @@
         }
     }
 
-    // Wait for the page to load before attaching event listeners
     document.addEventListener('DOMContentLoaded', () => {
         
-        // 2. Real Backend Login Connection
-        document.getElementById('loginForm').addEventListener('submit', async function(event) {
-            event.preventDefault();
+        // Single fetch function for both forms
+        async function handleAuthRequest(action, user, pass) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = "Processing...";
+            messageDiv.className = "";
 
+            try {
+                // Both forms now point to the exact same file: /api/auth
+                const response = await fetch('/api/auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: action, username: user, password: pass })
+                });
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    messageDiv.textContent = data.message;
+                    messageDiv.className = 'success';
+                    if (action === 'register') {
+                        document.getElementById('registerForm').reset();
+                    }
+                } else {
+                    messageDiv.textContent = data.message || 'Operation failed.';
+                    messageDiv.className = 'error';
+                }
+            } catch (error) {
+                messageDiv.textContent = 'Server error. Is the backend deployed?';
+                messageDiv.className = 'error';
+            }
+        }
+
+        // Login Listener
+        document.getElementById('loginForm').addEventListener('submit', function(event) {
+            event.preventDefault();
             const user = document.getElementById('username').value;
             const pass = document.getElementById('password').value;
-            const messageDiv = document.getElementById('message');
-
-            messageDiv.textContent = "Verifying login...";
-            messageDiv.className = "";
-
-            try {
-                const response = await fetch('/api/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: user, password: pass })
-                });
-
-                const data = await response.json();
-
-                if (response.ok && data.success) {
-                    messageDiv.textContent = data.message;
-                    messageDiv.className = 'success';
-                } else {
-                    messageDiv.textContent = data.message || 'Authentication failed.';
-                    messageDiv.className = 'error';
-                }
-            } catch (error) {
-                messageDiv.textContent = 'Server error. Is the backend deployed?';
-                messageDiv.className = 'error';
-            }
+            handleAuthRequest('login', user, pass);
         });
 
-        // 3. Real Backend Registration Connection
-        document.getElementById('registerForm').addEventListener('submit', async function(event) {
+        // Register Listener
+        document.getElementById('registerForm').addEventListener('submit', function(event) {
             event.preventDefault();
-
             const newUser = document.getElementById('newUsername').value;
             const newPass = document.getElementById('newPassword').value;
-            const messageDiv = document.getElementById('message');
-
-            messageDiv.textContent = "Creating account...";
-            messageDiv.className = "";
-
-            try {
-                const response = await fetch('/api/register', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: newUser, password: newPass })
-                });
-
-                const data = await response.json();
-
-                if (response.ok && data.success) {
-                    messageDiv.textContent = data.message;
-                    messageDiv.className = 'success';
-                    document.getElementById('registerForm').reset();
-                } else {
-                    messageDiv.textContent = data.message || 'Registration failed.';
-                    messageDiv.className = 'error';
-                }
-            } catch (error) {
-                messageDiv.textContent = 'Server error. Is the backend deployed?';
-                messageDiv.className = 'error';
-            }
+            handleAuthRequest('register', newUser, newPass);
         });
     });
 </script>
